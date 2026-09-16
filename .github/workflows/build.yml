@@ -39,9 +39,12 @@ jobs:
           if [ "$REF" = "master" ] || [ "$REF" = "vsfilter_rc" ] ; then
               name="VSFilter"
               delete="XySubFilter"
-          elif echo "$REF" | grep -qE '^xy_sub_filter_rc' ; then
-              name="SubFilter"
-              delete="VSFilter"
+          # xy-VSFilter specific changes weren't merged back into the
+          # XySubFilter branch, so it normally shouldn't be used to build
+          # xy-VSFilter. But in pinterf/xy-VSFilter there’s only one branch.
+          #elif echo "$REF" | grep -qE '^xy_sub_filter_rc' ; then
+          #    name="SubFilter"
+          #    delete="VSFilter"
           fi
 
           echo "name=$name" >> $GITHUB_OUTPUT
