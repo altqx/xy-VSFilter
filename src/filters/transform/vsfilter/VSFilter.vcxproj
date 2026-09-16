@@ -208,6 +208,9 @@
     <ProjectReference Include="..\basevideofilter\basevideofilter.vcxproj">
       <Project>{54dda60f-e528-4d07-a152-960a1e818680}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\..\..\Build\Boost\Boost.vcxproj">
+      <Project>{C91E1D87-614C-47E8-9587-393568D41738}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
