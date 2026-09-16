@@ -380,7 +380,7 @@ DEFINE_GUID(MEDIASUBTYPE_ADPCM_AMV,
 struct WAVEFORMATEXPS2 : public WAVEFORMATEX {
     DWORD dwInterleave;
 
-    struct WAVEFORMATEXPS2() {
+    WAVEFORMATEXPS2() {
         ZeroMemory(this, sizeof(*this));
         cbSize = sizeof(WAVEFORMATEXPS2) - sizeof(WAVEFORMATEX);
     }
@@ -518,6 +518,10 @@ DEFINE_GUID(FORMAT_SubtitleInfo,
 // {04EBA53E-9330-436c-9133-553EC87031DC}
 DEFINE_GUID(MEDIASUBTYPE_HDMVSUB,
             0x4eba53e, 0x9330, 0x436c, 0x91, 0x33, 0x55, 0x3e, 0xc8, 0x70, 0x31, 0xdc);
+
+// {C886D215-F485-40BB-8DB6-FADBC619A45D}
+DEFINE_GUID(MEDIASUBTYPE_WEBVTT,
+            0xc886d215, 0xf485, 0x40bb, 0x8d, 0xb6, 0xfa, 0xdb, 0xc6, 0x19, 0xa4, 0x5d);
 
 #pragma pack(push, 1)
 typedef struct {
@@ -1052,7 +1056,7 @@ DEFINE_GUID(MEDIASUBTYPE_HDMV_LPCM_AUDIO,
 struct WAVEFORMATEX_HDMV_LPCM : public WAVEFORMATEX {
     BYTE channel_conf;
 
-    struct WAVEFORMATEX_HDMV_LPCM() {
+    WAVEFORMATEX_HDMV_LPCM() {
         ZeroMemory(this, sizeof(*this));
         cbSize = sizeof(WAVEFORMATEX_HDMV_LPCM) - sizeof(WAVEFORMATEX);
     }
@@ -1080,7 +1084,7 @@ struct WAVEFORMATEXFFMPEG {
     int nCodecId;
     WAVEFORMATEX wfex;
 
-    struct WAVEFORMATEXFFMPEG() {
+    WAVEFORMATEXFFMPEG() {
         nCodecId = 0;
     }
 };
@@ -1156,6 +1160,8 @@ DEFINE_GUID_FOURCC(420R)
 DEFINE_GUID_FOURCC(422R)
 DEFINE_GUID_FOURCC(444R)
 DEFINE_GUID_FOURCC(Y416)
+DEFINE_GUID_FOURCC(YV24)
+
 
 // {212690FB-83E5-4526-8FD7-74478B7939CD} from wmcodecdsp.h
 DEFINE_GUID(CLSID_CMPEG2VidDecoderDS, 0x212690FB, 0x83E5, 0x4526, 0x8F, 0xD7, 0x74, 0x47, 0x8B, 0x79, 0x39, 0xCD);

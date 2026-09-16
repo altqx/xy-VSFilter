@@ -144,8 +144,13 @@ CTextSubtitleInputPinHepler::CTextSubtitleInputPinHepler( CRenderedTextSubtitle 
 
 STDMETHODIMP CTextSubtitleInputPinHepler::NewSegment( REFERENCE_TIME tStart, REFERENCE_TIME tStop, double dRate )
 {
-    m_pRTS->RemoveAllEntries();
-    m_pRTS->CreateSegments();
+    if (m_mt.subtype != MEDIASUBTYPE_WEBVTT) {
+      // WebVTT can be read as one big blob of data during pin connection, instead of as samples during playback.
+      // This depends on how it is being demuxed. So both situations need to be handled.
+      // Don't remove existing data in case of WebVTT. Instead we check for duplicates in CSimpleTextSubtitle::Add()
+      m_pRTS->RemoveAllEntries();
+      m_pRTS->CreateSegments();
+    }
     return __super::NewSegment(tStart,tStop,dRate);
 }
 
@@ -180,7 +185,7 @@ STDMETHODIMP CTextSubtitleInputPinHepler::Receive( IMediaSample* pSample )
                 }
                 else if(tag == __GAB1_ENTRY__)
                 {
-                    m_pRTS->Add((LPWSTR)CA2WEX<>(ptr), false, *(int*)ptr, *(int*)(ptr+4));
+                    m_pRTS->Add((LPWSTR)CA2WEX<>(ptr), false, MS2RT(*(int*)ptr), MS2RT(*(int*)(ptr+4)));
                 }
                 else if(tag == __GAB1_LANGUAGE_UNICODE__)
                 {
@@ -188,7 +193,7 @@ STDMETHODIMP CTextSubtitleInputPinHepler::Receive( IMediaSample* pSample )
                 }
                 else if(tag == __GAB1_ENTRY_UNICODE__)
                 {
-                    m_pRTS->Add((WCHAR*)(ptr+8), true, *(int*)ptr, *(int*)(ptr+4));
+                    m_pRTS->Add((WCHAR*)(ptr+8), true, MS2RT(*(int*)ptr), MS2RT(*(int*)(ptr+4)));
                 }
 
                 ptr += size;
@@ -225,7 +230,7 @@ STDMETHODIMP CTextSubtitleInputPinHepler::Receive( IMediaSample* pSample )
 
             if(!str.IsEmpty())
             {
-                m_pRTS->Add((LPWSTR)CA2WEX<>(str), false, (int)(tStart / 10000), (int)(tStop / 10000));
+                m_pRTS->Add((LPWSTR)CA2WEX<>(str), false, tStart, tStop);
             }
         }
         else
@@ -235,12 +240,12 @@ STDMETHODIMP CTextSubtitleInputPinHepler::Receive( IMediaSample* pSample )
     }
     else if(m_mt.majortype == MEDIATYPE_Subtitle)
     {
-        if(m_mt.subtype == MEDIASUBTYPE_UTF8)
+        if(m_mt.subtype == MEDIASUBTYPE_UTF8 || m_mt.subtype == MEDIASUBTYPE_WEBVTT)
         {
             CStringW str = UTF8To16(CStringA((LPCSTR)pData, len)).Trim();
             if(!str.IsEmpty())
             {
-                m_pRTS->Add(str, true, (int)(tStart / 10000), (int)(tStop / 10000));
+                m_pRTS->Add(str, true, tStart, tStop);
             }
             else
             {
@@ -257,24 +262,24 @@ STDMETHODIMP CTextSubtitleInputPinHepler::Receive( IMediaSample* pSample )
                 int fields = m_mt.subtype == MEDIASUBTYPE_ASS2 ? 10 : 9;
 
                 CAtlList<CStringW> sl;
-                Explode(str, sl, ',', fields);
+                ExplodeNoTrim(str, sl, ',', fields);
                 if(sl.GetCount() == fields)
                 {
                     stse.readorder = wcstol(sl.RemoveHead(), NULL, 10);
                     stse.layer = wcstol(sl.RemoveHead(), NULL, 10);
-                    stse.style = sl.RemoveHead();
-                    stse.actor = sl.RemoveHead();
+                    stse.style = sl.RemoveHead(); // no trim, its value is a lookup key
+                    stse.actor = sl.RemoveHead().Trim();
                     stse.marginRect.left = wcstol(sl.RemoveHead(), NULL, 10);
                     stse.marginRect.right = wcstol(sl.RemoveHead(), NULL, 10);
                     stse.marginRect.top = stse.marginRect.bottom = wcstol(sl.RemoveHead(), NULL, 10);
                     if(fields == 10) stse.marginRect.bottom = wcstol(sl.RemoveHead(), NULL, 10);
-                    stse.effect = sl.RemoveHead();
-                    stse.str = sl.RemoveHead();
+                    stse.effect = sl.RemoveHead().Trim();
+                    stse.str = sl.RemoveHead().Trim();
                 }
 
                 if(!stse.str.IsEmpty())
                 {
-                    m_pRTS->Add(stse.str, true, (int)(tStart / 10000), (int)(tStop / 10000), 
+                    m_pRTS->Add(stse.str, true, tStart, tStop, 
                         stse.style, stse.actor, stse.effect, stse.marginRect, stse.layer, stse.readorder);
                 }
             }
@@ -430,6 +435,7 @@ HRESULT CSubtitleInputPin::CheckMediaType(const CMediaType* pmt)
         || pmt->majortype == MEDIATYPE_Subtitle && (pmt->subtype == MEDIASUBTYPE_SSA || pmt->subtype == MEDIASUBTYPE_ASS || pmt->subtype == MEDIASUBTYPE_ASS2)
         || pmt->majortype == MEDIATYPE_Subtitle && pmt->subtype == MEDIASUBTYPE_SSF
         || pmt->majortype == MEDIATYPE_Subtitle && (pmt->subtype == MEDIASUBTYPE_VOBSUB)
+        || pmt->majortype == MEDIATYPE_Subtitle && pmt->subtype == MEDIASUBTYPE_WEBVTT
         || IsHdmvSub(pmt)
         ? S_OK 
         : E_FAIL;
@@ -497,15 +503,21 @@ STDMETHODIMP_(CSubtitleInputPinHelper*) CSubtitleInputPin::CreateHelper( const C
 
         if(mt.subtype == MEDIASUBTYPE_UTF8 
             /*|| m_mt.subtype == MEDIASUBTYPE_USF*/
-            || mt.subtype == MEDIASUBTYPE_SSA 
+            || mt.subtype == MEDIASUBTYPE_WEBVTT
+            || mt.subtype == MEDIASUBTYPE_SSA
             || mt.subtype == MEDIASUBTYPE_ASS 
-            || mt.subtype == MEDIASUBTYPE_ASS2)
+            || mt.subtype == MEDIASUBTYPE_ASS2
+            )
         {
             XY_LOG_INFO("Create CTextSubtitleInputPinHepler");
             CRenderedTextSubtitle* pRTS = DEBUG_NEW CRenderedTextSubtitle(m_pSubLock);
             pRTS->m_name = name;
             pRTS->m_lcid = lcid;
             pRTS->m_dstScreenSize = CSize(384, 288);
+
+            if (m_mt.subtype == MEDIASUBTYPE_WEBVTT) {
+                pRTS->m_subtitleType = EXTVTT;
+            }
 
             if(dwOffset > 0 && mt.cbFormat - dwOffset > 0)
             {

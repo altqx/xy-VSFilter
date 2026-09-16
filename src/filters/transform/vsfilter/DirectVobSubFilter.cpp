@@ -192,12 +192,14 @@ HRESULT CDirectVobSubFilter::TryNotCopy(IMediaSample* pIn, const CMediaType& mt,
     {
         m_spd.bits = static_cast<BYTE*>(m_pTempPicBuff);
         bool fYV12 = (mt.subtype == MEDIASUBTYPE_YV12 || mt.subtype == MEDIASUBTYPE_I420 || mt.subtype == MEDIASUBTYPE_IYUV);	
-        bool fNV12 = (mt.subtype == MEDIASUBTYPE_NV12 || mt.subtype == MEDIASUBTYPE_NV21);        
+        bool fYV16 = (mt.subtype == MEDIASUBTYPE_YV16);
+        bool fYV24 = (mt.subtype == MEDIASUBTYPE_YV24);
+        bool fNV12 = (mt.subtype == MEDIASUBTYPE_NV12 || mt.subtype == MEDIASUBTYPE_NV21);
         bool fP010 = (mt.subtype == MEDIASUBTYPE_P010 || mt.subtype == MEDIASUBTYPE_P016);
+        bool fP210 = (mt.subtype == MEDIASUBTYPE_P210 || mt.subtype == MEDIASUBTYPE_P216);
 
-        int bpp = fP010 ? 16 : (fYV12||fNV12) ? 8 : bihIn.biBitCount;
-        DWORD black = fP010 ? 0x10001000 : (fYV12||fNV12) ? 0x10101010 : (bihIn.biCompression == '2YUY') ? 0x80108010 : 0;
-
+        int bpp = fP010 || fP210 ? 16 : (fYV24|| fYV16 || fYV12||fNV12) ? 8 : bihIn.biBitCount;
+        DWORD black = fP010 || fP210 ? 0x10001000 : (fYV24 || fYV16 || fYV12||fNV12) ? 0x10101010 : (bihIn.biCompression == '2YUY') ? 0x80108010 : 0;
 
         if(FAILED(Copy((BYTE*)m_pTempPicBuff, pDataIn, sub, in, bpp, mt.subtype, black)))
             return E_FAIL;
@@ -214,12 +216,47 @@ HRESULT CDirectVobSubFilter::TryNotCopy(IMediaSample* pIn, const CMediaType& mt,
             if(FAILED(Copy(pSubU, pInU, sub, in, bpp, mt.subtype, 0x80808080)))
                 return E_FAIL;
         }
+        else if (fYV16)
+        {
+            BYTE* pSubV = (BYTE*)m_pTempPicBuff + (sub.cx * bpp >> 3) * sub.cy;
+            BYTE* pInV = pDataIn + (in.cx * bpp >> 3) * in.cy;
+            // no vertical subsampling
+            sub.cx >>= 1; /*sub.cy >>= 1;*/ in.cx >>= 1; /*in.cy >>= 1;*/
+            BYTE* pSubU = pSubV + (sub.cx * bpp >> 3) * sub.cy;
+            BYTE* pInU = pInV + (in.cx * bpp >> 3) * in.cy;
+            if (FAILED(Copy(pSubV, pInV, sub, in, bpp, mt.subtype, 0x80808080)))
+                return E_FAIL;
+            if (FAILED(Copy(pSubU, pInU, sub, in, bpp, mt.subtype, 0x80808080)))
+                return E_FAIL;
+        }
+        else if (fYV24)
+        {
+            BYTE* pSubV = (BYTE*)m_pTempPicBuff + (sub.cx * bpp >> 3) * sub.cy;
+            BYTE* pInV = pDataIn + (in.cx * bpp >> 3) * in.cy;
+            // no subsampling. sub.cx >>= 1; sub.cy >>= 1; in.cx >>= 1; in.cy >>= 1;
+            BYTE* pSubU = pSubV + (sub.cx * bpp >> 3) * sub.cy;
+            BYTE* pInU = pInV + (in.cx * bpp >> 3) * in.cy;
+            if (FAILED(Copy(pSubV, pInV, sub, in, bpp, mt.subtype, 0x80808080)))
+                return E_FAIL;
+            if (FAILED(Copy(pSubU, pInU, sub, in, bpp, mt.subtype, 0x80808080)))
+                return E_FAIL;
+        }
         else if (fP010)
         {
             BYTE* pSubUV = (BYTE*)m_pTempPicBuff + (sub.cx*bpp>>3)*sub.cy;
             BYTE* pInUV = pDataIn + (in.cx*bpp>>3)*in.cy;
+            // no sub.cx >>= 1 because P010 is word sized
             sub.cy >>= 1; in.cy >>= 1;
             if(FAILED(Copy(pSubUV, pInUV, sub, in, bpp, mt.subtype, 0x80008000)))
+                return E_FAIL;
+        }
+        else if (fP210)
+        {
+            BYTE* pSubUV = (BYTE*)m_pTempPicBuff + (sub.cx * bpp >> 3) * sub.cy;
+            BYTE* pInUV = pDataIn + (in.cx * bpp >> 3) * in.cy;
+            // no sub.cx >>= 1 because P010 is word sized
+            // no V subsampling // sub.cy >>= 1; in.cy >>= 1;
+            if (FAILED(Copy(pSubUV, pInUV, sub, in, bpp, mt.subtype, 0x80008000)))
                 return E_FAIL;
         }
         else if(fNV12) {
@@ -243,7 +280,7 @@ HRESULT CDirectVobSubFilter::Transform(IMediaSample* pIn)
 	{
 		double dRate = m_pInput->CurrentRate();
 
-		m_tPrev = m_pInput->CurrentStartTime() + dRate*rtStart;
+        m_tPrev = m_pInput->CurrentStartTime() + rtStart * (m_bExternalSubtitle ? dRate : 1);
 
 		REFERENCE_TIME rtAvgTimePerFrame = rtStop - rtStart;
 		if(CComQIPtr<ISubClock2> pSC2 = m_pSubClock)
@@ -646,7 +683,10 @@ HRESULT CDirectVobSubFilter::NewSegment(REFERENCE_TIME tStart, REFERENCE_TIME tS
 REFERENCE_TIME CDirectVobSubFilter::CalcCurrentTime()
 {
 	REFERENCE_TIME rt = m_pSubClock ? m_pSubClock->GetTime() : m_tPrev;
-	return (rt - 10000i64*m_SubtitleDelay) * m_SubtitleSpeedMul / m_SubtitleSpeedDiv; // no, it won't overflow if we use normal parameters (__int64 is enough for about 2000 hours if we multiply it by the max: 65536 as m_SubtitleSpeedMul)
+    // no, it won't overflow even without normalizing if we use normal parameters
+    // (__int64 is enough for about 2000 hours if we multiply it by the max: 65536 as m_SubtitleSpeedMul)
+    // anyway, m_SubtitleSpeed and m_SubtitleSpeedDiv parameters are normalized upon read
+    return (rt - 10000i64 * m_SubtitleDelay) * m_SubtitleSpeedNormalizedMul / m_SubtitleSpeedNormalizedDiv;
 }
 
 void CDirectVobSubFilter::InitSubPicQueue()
@@ -689,18 +729,27 @@ void CDirectVobSubFilter::InitSubPicQueue()
     else if(subtype == MEDIASUBTYPE_NV12) m_spd.type = MSP_NV12;
     else if(subtype == MEDIASUBTYPE_NV21) m_spd.type = MSP_NV21;
     else if(subtype == MEDIASUBTYPE_AYUV) m_spd.type = MSP_AYUV;
+    // pf additions
+    else if (subtype == MEDIASUBTYPE_YV16) m_spd.type = MSP_YV16;
+    else if (subtype == MEDIASUBTYPE_YV24) m_spd.type = MSP_YV24;
+    else if (subtype == MEDIASUBTYPE_P210) m_spd.type = MSP_P210;
+    else if (subtype == MEDIASUBTYPE_P216) m_spd.type = MSP_P216;
 
 	m_spd.w = m_w;
 	m_spd.h = m_h;
-	m_spd.bpp = (m_spd.type == MSP_P010 || m_spd.type == MSP_P016) ? 16 :
-        (m_spd.type == MSP_YV12 || m_spd.type == MSP_IYUV || m_spd.type == MSP_NV12 || m_spd.type == MSP_NV21) ? 8 : bihIn.biBitCount;
+	m_spd.bpp = (m_spd.type == MSP_P010 || m_spd.type == MSP_P016 || m_spd.type == MSP_P210 || m_spd.type == MSP_P216) ? 16 :
+        (m_spd.type == MSP_YV12 || m_spd.type == MSP_IYUV || m_spd.type == MSP_NV12 || m_spd.type == MSP_NV21
+            || m_spd.type == MSP_YV16 || m_spd.type == MSP_YV24) ? 8 : bihIn.biBitCount;
 	m_spd.pitch = m_spd.w*m_spd.bpp>>3;
 
     m_pTempPicBuff.Free();
-    if(m_spd.type == MSP_YV12 || m_spd.type == MSP_IYUV || m_spd.type == MSP_NV12 || m_spd.type == MSP_NV21)
+    if(m_spd.type == MSP_YV12 || m_spd.type == MSP_IYUV || m_spd.type == MSP_NV12 || m_spd.type == MSP_NV21
+        || m_spd.type == MSP_YV16 || m_spd.type == MSP_YV24)
         m_pTempPicBuff.Allocate(4*m_spd.pitch*m_spd.h);//fix me: can be smaller
-    else if(m_spd.type == MSP_P010 || m_spd.type == MSP_P016)
-        m_pTempPicBuff.Allocate(m_spd.pitch*m_spd.h+m_spd.pitch*m_spd.h/2);
+    else if (m_spd.type == MSP_P010 || m_spd.type == MSP_P016) // 4:2:0
+        m_pTempPicBuff.Allocate(m_spd.pitch * m_spd.h + m_spd.pitch * m_spd.h / 4 * 2);
+    else if(m_spd.type == MSP_P210 || m_spd.type == MSP_P216) // 4:2:2
+        m_pTempPicBuff.Allocate(m_spd.pitch*m_spd.h+m_spd.pitch*m_spd.h/2*2);
     else
         m_pTempPicBuff.Allocate(m_spd.pitch*m_spd.h);
 	m_spd.bits = (BYTE*)m_pTempPicBuff;
@@ -1519,6 +1568,9 @@ bool CDirectVobSubFilter::Open()
 
 	m_frd.files.RemoveAll();
 
+    m_bExternalSubtitle = false;
+    m_ExternalSubstreams.clear();
+
 	CAtlArray<CString> paths;
 
 	for(int i = 0; i < 10; i++)
@@ -1577,6 +1629,8 @@ bool CDirectVobSubFilter::Open()
 			m_pSubStreams.AddTail(pSubStream);
             m_fIsSubStreamEmbeded.AddTail(false);
 			m_frd.files.AddTail(ret[i].full_file_name);
+
+            m_ExternalSubstreams.push_back(pSubStream);
 		}
 	}
 
@@ -1791,8 +1845,10 @@ void CDirectVobSubFilter::SetSubtitle(ISubStream* pSubStream, bool fApplyDefStyl
     SetYuvMatrix();
 
     m_xy_size_opt[SIZE_ASS_PLAY_RESOLUTION] = playres;
-    if(m_simple_provider)
+    if (m_simple_provider) {
+        m_bExternalSubtitle = (std::find(m_ExternalSubstreams.cbegin(), m_ExternalSubstreams.cend(), pSubStream) != m_ExternalSubstreams.cend());
         m_simple_provider->SetSubPicProvider(CComQIPtr<ISubPicProviderEx>(pSubStream));
+    }
 }
 
 void CDirectVobSubFilter::InvalidateSubtitle(REFERENCE_TIME rtInvalidate, DWORD_PTR nSubtitleId)

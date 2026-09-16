@@ -1196,10 +1196,13 @@ STDMETHODIMP XySubFilter::RequestFrame( REFERENCE_TIME start, REFERENCE_TIME sto
             return hr;
         }
 
-        //
-        REFERENCE_TIME adjustedStart = (start - 10000i64*m_SubtitleDelay) * m_SubtitleSpeedMul / m_SubtitleSpeedDiv; // no, it won't overflow if we use normal parameters (__int64 is enough for about 2000 hours if we multiply it by the max: 65536 as m_SubtitleSpeedMul)
-        REFERENCE_TIME adjustedStop = (stop - 10000i64*m_SubtitleDelay) * m_SubtitleSpeedMul / m_SubtitleSpeedDiv;
-        REFERENCE_TIME now = adjustedStart; //NOTE: It seems that the physically right way is (start + stop) / 2, but...
+        // no, it won't overflow even without normalizing if we use normal parameters
+        // (__int64 is enough for about 2000 hours if we multiply it by the max: 65536 as m_SubtitleSpeedMul)
+        // anyway, m_SubtitleSpeed and m_SubtitleSpeedDiv parameters are normalized upon read
+        start = (start - 10000i64 * m_SubtitleDelay) * m_SubtitleSpeedNormalizedMul / m_SubtitleSpeedNormalizedDiv;
+        stop = (stop - 10000i64 * m_SubtitleDelay) * m_SubtitleSpeedNormalizedMul / m_SubtitleSpeedNormalizedDiv;
+
+        REFERENCE_TIME now = start; //NOTE: It seems that the physically right way is (start + stop) / 2, but...
         m_last_requested = now;
 
         if(m_sub_provider)
@@ -2575,8 +2578,8 @@ CStringW XySubFilter::DumpProviderInfo()
     CAutoLock cAutoLock(&m_csProviderFields);
     CStringW strTemp;
     strTemp.Format(L"name:'%ls' version:'%ls' yuvMatrix:'%ls' outputLevels:'%ls' combineBitmaps:%ls",
-        m_xy_str_opt[STRING_NAME]      , m_xy_str_opt[STRING_VERSION],
-        m_xy_str_opt[STRING_YUV_MATRIX], m_xy_str_opt[STRING_OUTPUT_LEVELS],
+        m_xy_str_opt[STRING_NAME].GetString()      , m_xy_str_opt[STRING_VERSION].GetString(),
+        m_xy_str_opt[STRING_YUV_MATRIX].GetString(), m_xy_str_opt[STRING_OUTPUT_LEVELS].GetString(),
         m_xy_bool_opt[BOOL_COMBINE_BITMAPS]?L"True":L"False");
     return strTemp;
 }
@@ -2586,7 +2589,7 @@ CStringW XySubFilter::DumpConsumerInfo()
     CAutoLock cAutolock(&m_csFilter);
     CStringW strTemp;
     strTemp.Format(L"name:'%ls' version:'%ls' yuvMatrix:'%ls' supportedLevels:'%d'",
-        m_xy_str_opt[STRING_CONNECTED_CONSUMER], m_xy_str_opt[STRING_CONSUMER_VERSION],
-        m_xy_str_opt[STRING_CONSUMER_YUV_MATRIX], m_xy_int_opt[INT_CONSUMER_SUPPORTED_LEVELS]);
+        m_xy_str_opt[STRING_CONNECTED_CONSUMER].GetString(), m_xy_str_opt[STRING_CONSUMER_VERSION].GetString(),
+        m_xy_str_opt[STRING_CONSUMER_YUV_MATRIX].GetString(), m_xy_int_opt[INT_CONSUMER_SUPPORTED_LEVELS]);
     return strTemp;
 }
