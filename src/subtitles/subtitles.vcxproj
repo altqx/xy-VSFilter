@@ -227,7 +227,7 @@
     <ClInclude Include="xy_widen_regoin.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\Build\Boost\Boost.vcxproj">
+    <ProjectReference Include="..\..\..\..\Thirdparty\Build\Boost\Boost.vcxproj">
       <Project>{C91E1D87-614C-47E8-9587-393568D41738}</Project>
     </ProjectReference>
     <ProjectReference Include="libssf\libssf.vcxproj">
