@@ -84,17 +84,17 @@
   <ItemDefinitionGroup>
     <Link>
       <ModuleDefinitionFile>VSFilter.def</ModuleDefinitionFile>
-      <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">atls.lib;delayimp.lib;dsutil.lib;subtitles.lib;boost.lib;subpic.lib;Kasumi.lib;system.lib;libssf.lib;winmm.lib;dwmapi.lib;Mfuuid.lib;baseclasses.lib</AdditionalDependencies>
+      <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">atls.lib;delayimp.lib;dsutil.lib;subtitles.lib;subpic.lib;Kasumi.lib;system.lib;libssf.lib;winmm.lib;dwmapi.lib;Mfuuid.lib;BaseClassesStatic.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)bin\$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalLibraryDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)bin\$(Platform)\$(Configuration)\;</AdditionalLibraryDirectories>
       <AdditionalLibraryDirectories Condition="'$(Configuration)|$(Platform)'=='Rel_AVX512|x64'">$(SolutionDir)bin\$(Platform)\$(Configuration)\;</AdditionalLibraryDirectories>
-      <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Release|x64'">atls.lib;delayimp.lib;baseclasses.lib;dsutil.lib;subtitles.lib;boost.lib;subpic.lib;Kasumi.lib;system.lib;libssf.lib;unrar.lib;winmm.lib;dwmapi.lib;Mfuuid.lib</AdditionalDependencies>
-      <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Rel_AVX512|x64'">atls.lib;delayimp.lib;baseclasses.lib;dsutil.lib;subtitles.lib;boost.lib;subpic.lib;Kasumi.lib;system.lib;libssf.lib;unrar.lib;winmm.lib;dwmapi.lib;Mfuuid.lib</AdditionalDependencies>
+      <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Release|x64'">atls.lib;delayimp.lib;BaseClassesStatic.lib;dsutil.lib;subtitles.lib;subpic.lib;Kasumi.lib;system.lib;libssf.lib;unrar.lib;winmm.lib;dwmapi.lib;Mfuuid.lib</AdditionalDependencies>
+      <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Rel_AVX512|x64'">atls.lib;delayimp.lib;BaseClassesStatic.lib;dsutil.lib;subtitles.lib;subpic.lib;Kasumi.lib;system.lib;libssf.lib;unrar.lib;winmm.lib;dwmapi.lib;Mfuuid.lib</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </IgnoreSpecificDefaultLibraries>
       <IgnoreSpecificDefaultLibraries Condition="'$(Configuration)|$(Platform)'=='Rel_AVX512|x64'">
       </IgnoreSpecificDefaultLibraries>
-      <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">atls.lib;delayimp.lib;baseclasses.lib;dsutil.lib;subtitles.lib;boost.lib;subpic.lib;Kasumi.lib;system.lib;libssf.lib;unrar.lib;winmm.lib;dwmapi.lib;Mfuuid.lib</AdditionalDependencies>
+      <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">atls.lib;delayimp.lib;BaseClassesStatic.lib;dsutil.lib;subtitles.lib;subpic.lib;Kasumi.lib;system.lib;libssf.lib;unrar.lib;winmm.lib;dwmapi.lib;Mfuuid.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)bin\$(Platform)\$(Configuration)\;</AdditionalLibraryDirectories>
     </Link>
     <ResourceCompile>
@@ -187,8 +187,8 @@
     <None Include="VSFilter.def" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\Build\BaseClasses\baseclasses.vcxproj">
-      <Project>{e8a3f6fa-ae1c-4c8e-a0b6-9c8480324eaa}</Project>
+    <ProjectReference Include="..\..\..\..\..\Build\BaseClasses\BaseClassesStatic.vcxproj">
+      <Project>{14f7f004-c16f-4e41-a546-fee10207f325}</Project>
     </ProjectReference>
     <ProjectReference Include="..\..\..\dsutil\dsutil.vcxproj">
       <Project>{fc70988b-1ae5-4381-866d-4f405e28ac42}</Project>
@@ -207,9 +207,6 @@
     </ProjectReference>
     <ProjectReference Include="..\basevideofilter\basevideofilter.vcxproj">
       <Project>{54dda60f-e528-4d07-a152-960a1e818680}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\..\..\..\Thirdparty\Build\Boost\Boost.vcxproj">
-      <Project>{C91E1D87-614C-47E8-9587-393568D41738}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
