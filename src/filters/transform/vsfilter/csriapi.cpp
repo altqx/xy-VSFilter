@@ -143,8 +143,20 @@ CSRIAPI int csri_request_fmt(csri_inst *inst, const struct csri_fmt *fmt)
 			return -1;
 		break;
 	}
+	CSize screen_res(fmt->width, fmt->height);
+	// A host may ask again for the format an instance already has (HikariSub
+	// does each time it reuses a parsed instance). The provider it has still
+	// fits, and it keeps the subpicture it last rendered.
+	if (inst->spp && inst->pixfmt == fmt->pixfmt && inst->screen_res == screen_res)
+		return 0;
+	// A provider holds a reference to rts and its last subpicture. Without
+	// this release the replaced one leaks, and keeps rts alive past csri_close.
+	if (inst->spp) {
+		inst->spp->Release();
+		inst->spp = NULL;
+	}
 	inst->pixfmt=fmt->pixfmt;
-	inst->screen_res = CSize(fmt->width, fmt->height);
+	inst->screen_res = screen_res;
 	inst->video_rect = CRect(0, 0, fmt->width, fmt->height);
 	HRESULT hr=S_OK;
 	inst->spp=new SimpleSubPicProvider(col,inst->screen_res,inst->video_rect,NULL,&hr);
